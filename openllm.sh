@@ -80,8 +80,14 @@ pull_model() {
     # Create model directory
     mkdir -p "$MODELS_DIR/$model_name"
     
-    # Download model using OpenLLM
-    if $VLLM_BACKEND download "$model_name" --model-id "$model_name" --target-path "$MODELS_DIR/$model_name"; then
+    # Check if huggingface-cli is installed
+    if ! command -v huggingface-cli &> /dev/null; then
+        log_message "INFO" "Installing huggingface-hub..."
+        pip install huggingface-hub
+    fi
+    
+    # Download model using huggingface-cli
+    if huggingface-cli download "$model_name" --local-dir "$MODELS_DIR/$model_name"; then
         log_message "SUCCESS" "Model '$model_name' downloaded successfully"
     else
         log_message "ERROR" "Failed to download model '$model_name'"
