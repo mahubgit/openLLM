@@ -46,8 +46,10 @@ log_message() {
 
 # Function to check if a model exists
 check_model_exists() {
-    if [ ! -d "$MODELS_DIR/$1" ]; then
-        log_message "ERROR" "Model '$1' not found in $MODELS_DIR"
+    local full_path="$1"
+    local model_dir="$MODELS_DIR/${full_path/\//_}"
+    if [ ! -d "$model_dir" ]; then
+        log_message "ERROR" "Model '$full_path' not found in $MODELS_DIR"
         log_message "INFO" "Use './openllm.sh list' to see available models"
         return 1
     fi
@@ -56,24 +58,26 @@ check_model_exists() {
 
 # Function to check if a model is running
 is_model_running() {
-    local model_name="$1"
-    # Check both process existence and pid file
-    if [ -f "$MODELS_DIR/$model_name.pid" ]; then
-        local pid=$(cat "$MODELS_DIR/$model_name.pid")
+    local full_path="$1"
+    local model_dir="${full_path/\//_}"
+    if [ -f "$MODELS_DIR/$model_dir.pid" ]; then
+        local pid=$(cat "$MODELS_DIR/$model_dir.pid")
         if ps -p "$pid" > /dev/null 2>&1; then
-            return 0  # Model is running
+            return 0
         else
-            # Clean up stale PID file
-            rm -f "$MODELS_DIR/$model_name.pid"
+            rm -f "$MODELS_DIR/$model_dir.pid"
         fi
     fi
-    return 1  # Model is not running
+    return 1
 }
 
 # Function to get process ID of a running model
 get_model_pid() {
-    local model_name="$1"
-    pgrep -f "$VLLM_BACKEND.*$model_name"
+    local full_path="$1"
+    local model_dir="${full_path/\//_}"
+    if [ -f "$MODELS_DIR/$model_dir.pid" ]; then
+        cat "$MODELS_DIR/$model_dir.pid"
+    fi
 }
 
 # Function to pull (download) a model
