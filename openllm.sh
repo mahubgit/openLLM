@@ -83,12 +83,13 @@ get_model_pid() {
 # Function to pull (download) a model
 pull_model() {
     local model_name="$1"
+    local model_dir="${model_name/\//_}"
     
     log_message "INFO" "Downloading model: $model_name"
-    log_message "INFO" "Target directory: $MODELS_DIR/$model_name"
+    log_message "INFO" "Target directory: $MODELS_DIR/$model_dir"
     
     # Create model directory
-    mkdir -p "$MODELS_DIR/$model_name"
+    mkdir -p "$MODELS_DIR/$model_dir"
     
     # Check if huggingface-cli is installed
     if ! command -v huggingface-cli &> /dev/null; then
@@ -97,13 +98,13 @@ pull_model() {
     fi
     
     # Download model using huggingface-cli
-    if huggingface-cli download "$model_name" --local-dir "$MODELS_DIR/$model_name"; then
+    if huggingface-cli download "$model_name" --local-dir "$MODELS_DIR/$model_dir"; then
         log_message "SUCCESS" "Model '$model_name' downloaded successfully"
     else
         log_message "ERROR" "Failed to download model '$model_name'"
         log_message "INFO" "Please check your internet connection or model path"
         # Clean up the directory if download failed
-        rm -rf "$MODELS_DIR/$model_name"
+        rm -rf "$MODELS_DIR/$model_dir"
         exit 1
     fi
 }
