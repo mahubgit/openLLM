@@ -57,11 +57,17 @@ check_model_exists() {
 # Function to check if a model is running
 is_model_running() {
     local model_name="$1"
-    if pgrep -f "$VLLM_BACKEND.*$model_name" > /dev/null; then
-        return 0  # Model is running
-    else
-        return 1  # Model is not running
+    # Check both process existence and pid file
+    if [ -f "$MODELS_DIR/$model_name.pid" ]; then
+        local pid=$(cat "$MODELS_DIR/$model_name.pid")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            return 0  # Model is running
+        else
+            # Clean up stale PID file
+            rm -f "$MODELS_DIR/$model_name.pid"
+        fi
     fi
+    return 1  # Model is not running
 }
 
 # Function to get process ID of a running model
