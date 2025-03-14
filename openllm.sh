@@ -68,35 +68,37 @@ run_model() {
     local port="$3"
     local backend="$4"
     
-    # Check if model exists
-    if ! check_model_exists "$model_name"; then
+    # Debug: Print model information
+    echo "DEBUG: Model name: $model_name"
+    echo "DEBUG: Model path: $MODELS_DIR/$model_name"
+    echo "DEBUG: PID file will be: $MODELS_DIR/${model_name/\//_}.pid"
+    echo "DEBUG: Command to execute: $VLLM_BACKEND start --backend $backend --model $MODELS_DIR/$model_name --gpu-ids $gpu_indices --port $port"
+    
+    # Check if VLLM_BACKEND is set
+    if [ -z "$VLLM_BACKEND" ]; then
+        log_message "ERROR" "VLLM_BACKEND is not set"
         exit 1
     fi
     
-    # Check if model is already running
-    if is_model_running "$model_name"; then
-        log_message "ERROR" "Model '$model_name' is already running"
-        log_message "INFO" "To stop it, use './openllm.sh stop $model_name'"
-        exit 1
-    fi
-    
-    # Set CUDA_VISIBLE_DEVICES environment variable
-    export CUDA_VISIBLE_DEVICES="$gpu_indices"
-    
-    log_message "INFO" "Starting model: $model_name"
-    log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
-    
-    # Run the model with specified backend
+    # Run the model with specified backend and wait briefly to check if it starts
     nohup $VLLM_BACKEND start --backend "$backend" --model "$MODELS_DIR/$model_name" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
-    # Store the PID for later use
+    # Store the PID
     local pid=$!
-    echo "DEBUG: Process ID: $pid"
     echo $pid > "$MODELS_DIR/${model_name/\//_}.pid"
     
-    log_message "SUCCESS" "Model '$model_name' started successfully"
+    # Wait briefly to check if the process is still running
+    sleep 5
+    if ! ps -p $pid > /dev/null 2>&1; then
+        log_message "ERROR" "Process failed to start. Check log file for details:"
+        tail -n 20 "$MODELS_DIR/${model_name/\//_}.log"
+        rm -f "$MODELS_DIR/${model_name/\//_}.pid"
+        exit 1
+    fi
+    
+    log_message "SUCCESS" "Model '$model_name' started successfully (PID: $pid)"
     log_message "INFO" "API available at: http://localhost:$port/docs"
-    log_message "INFO" "Log file: $MODELS_DIR/$model_name.log"
+    log_message "INFO" "Log file: $MODELS_DIR/${model_name/\//_}.log"
 }
 
 # Function to check if a model is running
@@ -235,11 +237,6 @@ run_model() {
     local gpu_indices="$2"
     local port="$3"
     local backend="$4"
-    
-    # Debug: Print model information
-    echo "DEBUG: Model name: $model_name"
-    echo "DEBUG: Model path: $MODELS_DIR/$model_name"
-    echo "DEBUG: PID file will be: $MODELS_DIR/${model_name/\//_}.pid"
     
     # Check if model exists
     if ! check_model_exists "$model_name"; then
