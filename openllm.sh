@@ -186,20 +186,27 @@ show_status() {
         printf "  %-30s %-10s %-15s %s\n" "MODEL" "STATUS" "PID" "PORT"
         printf "  %-30s %-10s %-15s %s\n" "-----" "------" "---" "----"
         
+        # First, check direct subdirectories
         for model in "$MODELS_DIR"/*; do
             if [ -d "$model" ]; then
                 model_name=$(basename "$model")
-                if is_model_running "$model_name"; then
-                    pid=$(get_model_pid "$model_name")
-                    # Try to extract port from process command line
-                    port=$(ps -p $pid -o args= | grep -o "\-\-port [0-9]*" | awk '{print $2}')
-                    if [ -z "$port" ]; then
-                        port="$PORT_DEFAULT"
+                # Check if this directory contains another directory (nested structure)
+                for submodel in "$model"/*; do
+                    if [ -d "$submodel" ]; then
+                        sub_name=$(basename "$submodel")
+                        full_name="$model_name/$sub_name"
+                        if is_model_running "$full_name"; then
+                            pid=$(get_model_pid "$full_name")
+                            port=$(ps -p $pid -o args= | grep -o "\-\-port [0-9]*" | awk '{print $2}')
+                            if [ -z "$port" ]; then
+                                port="$PORT_DEFAULT"
+                            fi
+                            printf "  %-30s %-10s %-15s %s\n" "$full_name" "RUNNING" "$pid" "$port"
+                        else
+                            printf "  %-30s %-10s %-15s %s\n" "$full_name" "STOPPED" "-" "-"
+                        fi
                     fi
-                    printf "  %-30s %-10s %-15s %s\n" "$model_name" "RUNNING" "$pid" "$port"
-                else
-                    printf "  %-30s %-10s %-15s %s\n" "$model_name" "STOPPED" "-" "-"
-                fi
+                done
             fi
         done
     fi
