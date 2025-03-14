@@ -257,7 +257,11 @@ run_model() {
     log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
     
     # Run the model with specified backend
-    nohup $VLLM_BACKEND start --backend "$backend" --model "$MODELS_DIR/$model_name" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
+    nohup $VLLM_BACKEND serve --model-id "$MODELS_DIR/$model_name" \
+        --backend "$backend" \
+        --device cuda \
+        --device-id "$gpu_indices" \
+        --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
     # Store the PID for later use
     echo $! > "$MODELS_DIR/${model_name/\//_}.pid"

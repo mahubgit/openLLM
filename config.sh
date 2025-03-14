@@ -1,10 +1,8 @@
 #!/bin/bash
-
-# OpenLLM Configuration
-export MODELS_DIR="$(dirname "$0")/models"
-export GPU_DEFAULT="0,1"
-export VLLM_BACKEND="openllm"
-export PORT_DEFAULT="8000"
+MODELS_DIR="$(dirname "$0")/models"
+GPU_DEFAULT="0,1"
+VLLM_BACKEND="python -m openllm"  # Correction de la commande
+PORT_DEFAULT="8000"
 
 # Activate virtual environment if it exists
 if [ -d "$(dirname "$0")/venv" ]; then
