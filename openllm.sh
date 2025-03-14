@@ -73,12 +73,6 @@ run_model() {
         exit 1
     fi
     
-    # Use the actual directory structure
-    local model_path="$MODELS_DIR/$model_name"
-    if [ ! -d "$model_path" ]; then
-        model_path="$MODELS_DIR/${model_name/\//_}"
-    fi
-    
     # Check if model is already running
     if is_model_running "$model_name"; then
         log_message "ERROR" "Model '$model_name' is already running"
@@ -92,11 +86,13 @@ run_model() {
     log_message "INFO" "Starting model: $model_name"
     log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
     
-    # Run the model with specified backend using the correct path
-    nohup $VLLM_BACKEND start --backend "$backend" --model "$model_path" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
+    # Run the model with specified backend
+    nohup $VLLM_BACKEND start --backend "$backend" --model "$MODELS_DIR/$model_name" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
     # Store the PID for later use
-    echo $! > "$MODELS_DIR/${model_name/\//_}.pid"
+    local pid=$!
+    echo "DEBUG: Process ID: $pid"
+    echo $pid > "$MODELS_DIR/${model_name/\//_}.pid"
     
     log_message "SUCCESS" "Model '$model_name' started successfully"
     log_message "INFO" "API available at: http://localhost:$port/docs"
@@ -240,6 +236,11 @@ run_model() {
     local port="$3"
     local backend="$4"
     
+    # Debug: Print model information
+    echo "DEBUG: Model name: $model_name"
+    echo "DEBUG: Model path: $MODELS_DIR/$model_name"
+    echo "DEBUG: PID file will be: $MODELS_DIR/${model_name/\//_}.pid"
+    
     # Check if model exists
     if ! check_model_exists "$model_name"; then
         exit 1
@@ -259,10 +260,10 @@ run_model() {
     log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
     
     # Run the model with specified backend
-    nohup $VLLM_BACKEND start --backend "$backend" --model "$MODELS_DIR/$model_name" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/$model_name.log" 2>&1 &
+    nohup $VLLM_BACKEND start --backend "$backend" --model "$MODELS_DIR/$model_name" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
     # Store the PID for later use
-    echo $! > "$MODELS_DIR/$model_name.pid"
+    echo $! > "$MODELS_DIR/${model_name/\//_}.pid"
     
     log_message "SUCCESS" "Model '$model_name' started successfully"
     log_message "INFO" "API available at: http://localhost:$port/docs"
