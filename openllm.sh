@@ -61,6 +61,21 @@ check_model_exists() {
     return 1
 }
 
+# Function to check if a model is running
+is_model_running() {
+    local full_path="$1"
+    local model_dir="${full_path/\//_}"
+    if [ -f "$MODELS_DIR/$model_dir.pid" ]; then
+        local pid=$(cat "$MODELS_DIR/$model_dir.pid")
+        if ps -p "$pid" > /dev/null 2>&1; then
+            return 0
+        else
+            rm -f "$MODELS_DIR/$model_dir.pid"
+        fi
+    fi
+    return 1
+}
+
 # Function to run a model
 run_model() {
     local model_name="$1"
@@ -87,10 +102,10 @@ run_model() {
     log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
     
     # Run the model with specified backend
-    nohup python -m openllm serve "$MODELS_DIR/$model_name" \
+    nohup openllm serve falcon-40b \
+        --model-path "$MODELS_DIR/$model_name" \
         --backend "$backend" \
         --device cuda \
-        --gpu-id "$gpu_indices" \
         --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
     # Store the PID for later use
