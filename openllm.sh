@@ -47,13 +47,60 @@ log_message() {
 # Function to check if a model exists
 check_model_exists() {
     local full_path="$1"
-    local model_dir="$MODELS_DIR/${full_path/\//_}"
-    if [ ! -d "$model_dir" ]; then
-        log_message "ERROR" "Model '$full_path' not found in $MODELS_DIR"
-        log_message "INFO" "Use './openllm.sh list' to see available models"
-        return 1
+    # First check with slashes
+    if [ -d "$MODELS_DIR/$full_path" ]; then
+        return 0
     fi
-    return 0
+    # Then check with underscores
+    local model_dir="${full_path/\//_}"
+    if [ -d "$MODELS_DIR/$model_dir" ]; then
+        return 0
+    fi
+    log_message "ERROR" "Model '$full_path' not found in $MODELS_DIR"
+    log_message "INFO" "Use './openllm.sh list' to see available models"
+    return 1
+}
+
+# Function to run a model
+run_model() {
+    local model_name="$1"
+    local gpu_indices="$2"
+    local port="$3"
+    local backend="$4"
+    
+    # Check if model exists
+    if ! check_model_exists "$model_name"; then
+        exit 1
+    fi
+    
+    # Use the actual directory structure
+    local model_path="$MODELS_DIR/$model_name"
+    if [ ! -d "$model_path" ]; then
+        model_path="$MODELS_DIR/${model_name/\//_}"
+    fi
+    
+    # Check if model is already running
+    if is_model_running "$model_name"; then
+        log_message "ERROR" "Model '$model_name' is already running"
+        log_message "INFO" "To stop it, use './openllm.sh stop $model_name'"
+        exit 1
+    fi
+    
+    # Set CUDA_VISIBLE_DEVICES environment variable
+    export CUDA_VISIBLE_DEVICES="$gpu_indices"
+    
+    log_message "INFO" "Starting model: $model_name"
+    log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
+    
+    # Run the model with specified backend using the correct path
+    nohup $VLLM_BACKEND start --backend "$backend" --model "$model_path" --gpu-ids "$gpu_indices" --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
+    
+    # Store the PID for later use
+    echo $! > "$MODELS_DIR/${model_name/\//_}.pid"
+    
+    log_message "SUCCESS" "Model '$model_name' started successfully"
+    log_message "INFO" "API available at: http://localhost:$port/docs"
+    log_message "INFO" "Log file: $MODELS_DIR/$model_name.log"
 }
 
 # Function to check if a model is running
