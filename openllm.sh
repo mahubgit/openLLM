@@ -159,15 +159,13 @@ run_model() {
     log_message "INFO" "Starting model: $model_name"
     log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
     
-    # Extract model identifier
-    local model_id=$(basename "$model_name")
-    
     # Run the model with specified backend
-    nohup openllm serve "$model_id" \
+    nohup openllm start falcon-40b \
+        --model-name "tiiuae/falcon-40b" \
         --model-path "$MODELS_DIR/$model_name" \
         --backend "$backend" \
         --device cuda \
-        --gpu-id "$gpu_indices" \
+        --gpu "$gpu_indices" \
         --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
     
     # Store the PID and wait briefly to check if process started
