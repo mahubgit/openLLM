@@ -164,7 +164,6 @@ run_model() {
     
     # Run the model with specified backend
     nohup openllm serve "$model_id" \
-        --model-id "tiiuae/falcon-40b" \
         --model-path "$MODELS_DIR/$model_name" \
         --backend "$backend" \
         --device cuda \
