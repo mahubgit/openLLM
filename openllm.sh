@@ -83,10 +83,25 @@ run_model() {
     local port="$3"
     local backend="$4"
     
-    # Debug information
-    log_message "DEBUG" "Model path: $MODELS_DIR/$model_name"
+    # Check if model exists
+    if ! check_model_exists "$model_name"; then
+        exit 1
+    fi
     
-    # Extract model identifier (falcon-40b from tiiuae/falcon-40b)
+    # Check if model is already running
+    if is_model_running "$model_name"; then
+        log_message "ERROR" "Model '$model_name' is already running"
+        log_message "INFO" "To stop it, use './openllm.sh stop $model_name'"
+        exit 1
+    fi
+    
+    # Set CUDA_VISIBLE_DEVICES environment variable
+    export CUDA_VISIBLE_DEVICES="$gpu_indices"
+    
+    log_message "INFO" "Starting model: $model_name"
+    log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
+    
+    # Extract model identifier
     local model_id=$(basename "$model_name")
     
     # Run the model with specified backend
@@ -110,39 +125,10 @@ run_model() {
         rm -f "$MODELS_DIR/${model_name/\//_}.pid"
         exit 1
     fi
-}
-
-# Check if model exists
-if ! check_model_exists "$model_name"; then
-    exit 1
-fi
-
-# Check if model is already running
-if is_model_running "$model_name"; then
-    log_message "ERROR" "Model '$model_name' is already running"
-    log_message "INFO" "To stop it, use './openllm.sh stop $model_name'"
-    exit 1
-fi
-
-# Set CUDA_VISIBLE_DEVICES environment variable
-export CUDA_VISIBLE_DEVICES="$gpu_indices"
-
-log_message "INFO" "Starting model: $model_name"
-log_message "INFO" "GPU(s): $gpu_indices, Port: $port, Backend: $backend"
-
-# Run the model with specified backend
-nohup openllm serve falcon-40b \
-    --model-path "$MODELS_DIR/$model_name" \
-    --backend "$backend" \
-    --device cuda \
-    --port "$port" > "$MODELS_DIR/${model_name/\//_}.log" 2>&1 &
-
-# Store the PID for later use
-echo $! > "$MODELS_DIR/${model_name/\//_}.pid"
-
-log_message "SUCCESS" "Model '$model_name' started successfully"
-log_message "INFO" "API available at: http://localhost:$port/docs"
-log_message "INFO" "Log file: $MODELS_DIR/$model_name.log"
+    
+    log_message "SUCCESS" "Model '$model_name' started successfully"
+    log_message "INFO" "API available at: http://localhost:$port/docs"
+    log_message "INFO" "Log file: $MODELS_DIR/${model_name/\//_}.log"
 }
 
 # Function to stop a running model
