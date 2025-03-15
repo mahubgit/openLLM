@@ -1,19 +1,77 @@
 #!/bin/bash
 
-# Load configuration if exists
-CONFIG_FILE="$(dirname "$0")/config.sh"
-if [ -f "$CONFIG_FILE" ]; then
-    source "$CONFIG_FILE"
-else
-    # Default configuration if config file doesn't exist
-    MODELS_DIR="$(dirname "$0")/models"
-    GPU_DEFAULT="0,1"
-    VLLM_BACKEND="openllm"
-    PORT_DEFAULT="8000"
-fi
+# Configuration handling
+init_config() {
+    CONFIG_FILE="$(dirname "$0")/config.sh"
+    if [ -f "$CONFIG_FILE" ]; then
+        source "$CONFIG_FILE"
+    else
+        MODELS_DIR="$(dirname "$0")/models"
+        GPU_DEFAULT="0,1"
+        VLLM_BACKEND="openllm"
+        PORT_DEFAULT="8000"
+    fi
+    mkdir -p "$MODELS_DIR"
+}
 
-# Create models directory if it doesn't exist
-mkdir -p "$MODELS_DIR"
+# Model management functions
+get_model_pid() {
+    local full_path="$1"
+    local model_dir="${full_path/\//_}"
+    if [ -f "$MODELS_DIR/$model_dir.pid" ]; then
+        cat "$MODELS_DIR/$model_dir.pid"
+    fi
+}
+
+# Function to show detailed status of all models
+show_status() {
+    log_message "INFO" "Model Status:"
+    
+    if [ -z "$(ls -A $MODELS_DIR 2>/dev/null)" ]; then
+        echo "  No models found in $MODELS_DIR"
+        return
+    fi
+    
+    printf "  %-30s %-10s %-15s %s\n" "MODEL" "STATUS" "PID" "PORT"
+    printf "  %-30s %-10s %-15s %s\n" "-----" "------" "---" "----"
+    
+    for model in "$MODELS_DIR"/*; do
+        if [ -d "$model" ]; then
+            model_name=$(basename "$model")
+            if is_model_running "$model_name"; then
+                pid=$(get_model_pid "$model_name")
+                port=$(ps -p $pid -o args= | grep -o "\-\-port [0-9]*" | awk '{print $2}')
+                if [ -z "$port" ]; then
+                    port="$PORT_DEFAULT"
+                fi
+                printf "  %-30s %-10s %-15s %s\n" "$model_name" "RUNNING" "$pid" "$port"
+            else
+                printf "  %-30s %-10s %-15s %s\n" "$model_name" "STOPPED" "-" "-"
+            fi
+        fi
+    done
+}
+
+# Function to list all local models
+list_models() {
+    log_message "INFO" "Available local models:"
+    
+    if [ -z "$(ls -A $MODELS_DIR 2>/dev/null)" ]; then
+        echo "  No models found in $MODELS_DIR"
+        return
+    fi
+    
+    for model in "$MODELS_DIR"/*; do
+        if [ -d "$model" ]; then
+            model_name=$(basename "$model")
+            if is_model_running "$model_name"; then
+                echo "  - $model_name (RUNNING)"
+            else
+                echo "  - $model_name"
+            fi
+        fi
+    done
+}
 
 # Function to display usage information
 usage() {
@@ -181,98 +239,30 @@ stop_all_models() {
 }
 
 # Main script logic
-if [ $# -lt 1 ]; then
-    usage
-fi
-
-command="$1"
-shift
-
-case "$command" in
-    pull)
-        if [ $# -lt 1 ]; then
-            log_message "ERROR" "Model name required"
-            usage
-        fi
-        pull_model "$1"
-        ;;
-    list)
-        list_models
-        ;;
-    status)
-        show_status
-        ;;
-    remove)
-        if [ $# -lt 1 ]; then
-            log_message "ERROR" "Model name required"
-            usage
-        fi
-        remove_model "$1"
-        ;;
-    run)
-        if [ $# -lt 1 ]; then
-            log_message "ERROR" "Model name required"
-            usage
-        fi
-        
-        model_name="$1"
-        shift
-        
-        # Default values
-        gpu_indices="$GPU_DEFAULT"
-        port="$PORT_DEFAULT"
-        backend="vllm"
-        
-        # Parse additional arguments
-        while [ $# -gt 0 ]; do
-            case "$1" in
-                --gpu)
-                    if [ $# -lt 2 ]; then
-                        log_message "ERROR" "--gpu option requires GPU indices"
-                        usage
-                    fi
-                    gpu_indices="$2"
-                    shift 2
-                    ;;
-                --port)
-                    if [ $# -lt 2 ]; then
-                        log_message "ERROR" "--port option requires port number"
-                        usage
-                    fi
-                    port="$2"
-                    shift 2
-                    ;;
-                --backend)
-                    if [ $# -lt 2 ]; then
-                        log_message "ERROR" "--backend option requires backend name"
-                        usage
-                    fi
-                    backend="$2"
-                    shift 2
-                    ;;
-                *)
-                    log_message "ERROR" "Unknown option: $1"
-                    usage
-                    ;;
-            esac
-        done
-        
-        run_model "$model_name" "$gpu_indices" "$port" "$backend"
-        ;;
-    stop)
-        if [ $# -lt 1 ]; then
-            log_message "ERROR" "Model name required"
-            usage
-        fi
-        stop_model "$1"
-        ;;
-    stop_all)
-        stop_all_models
-        ;;
-    *)
-        log_message "ERROR" "Unknown command: $command"
+# Main execution
+main() {
+    init_config
+    
+    if [ $# -lt 1 ]; then
         usage
-        ;;
-esac
+    fi
+
+    command="$1"
+    shift
+
+    case "$command" in
+        pull)    [ $# -lt 1 ] && { log_message "ERROR" "Model name required"; usage; }; pull_model "$1" ;;
+        list)    list_models ;;
+        status)  show_status ;;
+        remove)  [ $# -lt 1 ] && { log_message "ERROR" "Model name required"; usage; }; remove_model "$1" ;;
+        run)     handle_run_command "$@" ;;
+        stop)    [ $# -lt 1 ] && { log_message "ERROR" "Model name required"; usage; }; stop_model "$1" ;;
+        stop_all) stop_all_models ;;
+        *)       log_message "ERROR" "Unknown command: $command"; usage ;;
+    esac
+}
+
+# Run the script
+main "$@"
 
 exit 0
