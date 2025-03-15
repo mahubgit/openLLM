@@ -238,6 +238,58 @@ stop_all_models() {
     fi
 }
 
+# Function to handle run command and its arguments
+handle_run_command() {
+    if [ $# -lt 1 ]; then
+        log_message "ERROR" "Model name required"
+        usage
+    fi
+    
+    model_name="$1"
+    shift
+    
+    # Default values
+    gpu_indices="$GPU_DEFAULT"
+    port="$PORT_DEFAULT"
+    backend="vllm"
+    
+    # Parse additional arguments
+    while [ $# -gt 0 ]; do
+        case "$1" in
+            --gpu)
+                if [ $# -lt 2 ]; then
+                    log_message "ERROR" "--gpu option requires GPU indices"
+                    usage
+                fi
+                gpu_indices="$2"
+                shift 2
+                ;;
+            --port)
+                if [ $# -lt 2 ]; then
+                    log_message "ERROR" "--port option requires port number"
+                    usage
+                fi
+                port="$2"
+                shift 2
+                ;;
+            --backend)
+                if [ $# -lt 2 ]; then
+                    log_message "ERROR" "--backend option requires backend name"
+                    usage
+                fi
+                backend="$2"
+                shift 2
+                ;;
+            *)
+                log_message "ERROR" "Unknown option: $1"
+                usage
+                ;;
+        esac
+    done
+    
+    run_model "$model_name" "$gpu_indices" "$port" "$backend"
+}
+
 # Main script logic
 # Main execution
 main() {
